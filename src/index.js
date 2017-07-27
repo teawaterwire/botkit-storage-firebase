@@ -1,4 +1,4 @@
-var Firebase = require('firebase');
+var FirebaseAdmin = require("firebase-admin");
 
 /**
  * The Botkit firebase driver
@@ -7,33 +7,42 @@ var Firebase = require('firebase');
  * @returns {{teams: {get, save, all}, channels: {get, save, all}, users: {get, save, all}}}
  */
 module.exports = function(config) {
+  if (!config || !config.firebase_uri) {
+    throw new Error("firebase_uri is required.");
+  }
 
-    if (!config || !config.firebase_uri) {
-        throw new Error('firebase_uri is required.');
+  // var serviceAccount = require(config.firebase_path);
+  var serviceAccount = JSON.parse(config.firebase_json);
+
+  // Initialize the app with a service account, granting admin privileges
+  FirebaseAdmin.initializeApp({
+    credential: FirebaseAdmin.credential.cert(serviceAccount),
+    databaseURL: config.firebase_uri
+  });
+
+  // As an admin, the app has access to read and write all data, regardless of Security Rules
+  var rootRef = FirebaseAdmin.database().ref(),
+    teamsRef = rootRef.child("teams"),
+    usersRef = rootRef.child("users"),
+    channelsRef = rootRef.child("channels");
+
+  return {
+    teams: {
+      get: get(teamsRef),
+      save: save(teamsRef),
+      all: all(teamsRef)
+    },
+    channels: {
+      get: get(channelsRef),
+      save: save(channelsRef),
+      all: all(channelsRef)
+    },
+    users: {
+      get: get(usersRef),
+      save: save(usersRef),
+      all: all(usersRef)
     }
-
-    var rootRef = new Firebase(config.firebase_uri),
-        teamsRef = rootRef.child('teams'),
-        usersRef = rootRef.child('users'),
-        channelsRef = rootRef.child('channels');
-
-    return {
-        teams: {
-            get: get(teamsRef),
-            save: save(teamsRef),
-            all: all(teamsRef)
-        },
-        channels: {
-            get: get(channelsRef),
-            save: save(channelsRef),
-            all: all(channelsRef)
-        },
-        users: {
-            get: get(usersRef),
-            save: save(usersRef),
-            all: all(usersRef)
-        }
-    };
+  };
 };
 
 /**
@@ -43,13 +52,13 @@ module.exports = function(config) {
  * @returns {Function} The get function
  */
 function get(firebaseRef) {
-    return function(id, cb) {
-        firebaseRef.child(id).once('value', success, cb);
+  return function(id, cb) {
+    firebaseRef.child(id).once("value", success, cb);
 
-        function success(records) {
-            cb(null, records.val());
-        }
-    };
+    function success(records) {
+      cb(null, records.val());
+    }
+  };
 }
 
 /**
@@ -59,11 +68,11 @@ function get(firebaseRef) {
  * @returns {Function} The save function
  */
 function save(firebaseRef) {
-    return function(data, cb) {
-        var firebase_update = {};
-        firebase_update[data.id] = data;
-        firebaseRef.update(firebase_update, cb);
-    };
+  return function(data, cb) {
+    var firebase_update = {};
+    firebase_update[data.id] = data;
+    firebaseRef.update(firebase_update, cb);
+  };
 }
 
 /**
@@ -73,21 +82,21 @@ function save(firebaseRef) {
  * @returns {Function} The all function
  */
 function all(firebaseRef) {
-    return function(cb) {
-        firebaseRef.once('value', success, cb);
+  return function(cb) {
+    firebaseRef.once("value", success, cb);
 
-        function success(records) {
-            var results = records.val();
+    function success(records) {
+      var results = records.val();
 
-            if (!results) {
-                return cb(null, []);
-            }
+      if (!results) {
+        return cb(null, []);
+      }
 
-            var list = Object.keys(results).map(function(key) {
-                return results[key];
-            });
+      var list = Object.keys(results).map(function(key) {
+        return results[key];
+      });
 
-            cb(null, list);
-        }
-    };
+      cb(null, list);
+    }
+  };
 }
